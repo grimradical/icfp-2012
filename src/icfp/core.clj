@@ -1,6 +1,7 @@
 (ns icfp.core)
 
-(defstruct game-state :board :lambdas :rocks :robot :score :moves)
+(defstruct game-state :board :lambdas :rocks :robot :score :moves
+    :water :flooding :waterproof)
 
 (defn robot?
   [{:keys [board]} position]
@@ -147,7 +148,8 @@
         lower-right-pos (down (right position))]
     (if (and ((some-fn rock? lambda?) lower-pos)
              (space? right-pos)
-             (space? lower-right-pos)))))
+             (space? lower-right-pos))
+      lower-right-pos)))
 
 (defn fall-left
   [board position]
@@ -156,7 +158,8 @@
         lower-left-pos (down (left position))]
     (if (and (rock? lower-pos)
              (space? left-pos)
-             (space? lower-left-pos)))))
+             (space? lower-left-pos))
+      lower-left-pos)))
 
 (def fall-rock
   (some-fn fall-down fall-right fall-left last))
