@@ -1,7 +1,6 @@
 (ns icfp.viz
   (:require [icfp.core :as core])
-  (:use quil.core)
-  )
+  (:use quil.core))
 
 (def sprite-size 16)
 
@@ -12,13 +11,13 @@
     (fill 0 0 0)
     (doseq [[x ys] board
             [y obj] ys
-            :let [x (trans-x x)
-                  y (trans-y y)]]
+            :let [xp (trans-x x)
+                  yp (trans-y y)]]
       (if-let [i (images obj)]
-        (image i (- x sprite-size) (- y sprite-size))
+        (image i (- xp sprite-size) (- yp sprite-size))
         (do
           (apply fill (colors obj))
-          (rect (- x sprite-size) (- y sprite-size) 16 16))))))
+          (rect (- xp sprite-size) (- yp sprite-size) 16 16))))))
 
 (defn setup-with-game
   [{:keys [board] :as game}]
@@ -38,12 +37,14 @@
     (draw-game game)))
 
 (defn game-to-sketch
-  [{:keys [board] :as game}]
-  (let [_ "aawef"
+  [game-ref]
+  (let [{:keys [board] :as game} (deref game-ref)
         w (* sprite-size (core/width board))
         h (* sprite-size (core/height board))]
     (sketch
      :setup (setup-with-game game)
      :title "Digger!"
+     :draw (fn []
+             (draw-game (deref game-ref)))
      :size [(* 1.5 w) (* 1.5 h)]
      )))
