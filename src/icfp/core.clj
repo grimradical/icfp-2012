@@ -96,30 +96,42 @@
   ;; rock, move the robot, remove the old rock, add the new rock. Otherwise
   ;; just move the robot.
   (if (rock? game-state (direction robot))
-    (-> game-state
-      (update-in [:robot] direction)
-      (update-in [:rocks] disj (direction robot))
-      (update-in [:rocks] conj (direction (direction robot))))
+    (let [old-rock (direction robot)
+          new-rock (direction (direction robot))]
+      (-> game-state
+        (update-in [:robot] direction)
+        (update-in [:rocks] disj old-rock)
+        (update-in [:rocks] conj new-rock)
+        (assoc :board (assoc-in board old-rock :*))
+        (assoc :board (assoc-in board new-rock :_))))
     (update-in [:robot] direction)))
 
 (defn move
   [{:keys [board robot] :as game-state} command]
-  (condp = command
-    :L (move-sideways game-state left)
-    :R (move-sideways game-state right)
-    :U (update-in game-state [:robot] up)
-    :D (update-in game-state [:robot] down)))
+  (let [moved-state (condp = command
+                      :L (move-sideways game-state left)
+                      :R (move-sideways game-state right)
+                      :U (update-in game-state [:robot] up)
+                      :D (update-in game-state [:robot] down))
+        new-robot   (:robot game-state)
+        moved-state (-> moved-state
+                      (assoc :board (assoc-in board robot :_))
+                      (assoc :board (assoc-in board new-robot :R)))]
+    ;; If there WAS a lambda in the new space, add points!
+    (if (lambda? game-state (game-state :robot))
+      (update-in moved-state [:score] + 25)
+      moved-state)))
 
 (defn execute-command
   [{:keys [moves] :as game-state} command]
   (if (command-allowed? game-state command)
-    (cond
-      ([:L :R :U :D] command)
-      (move game-state command)
+    (let [new-state (cond
+                      ([:L :R :U :D] command)
+                      (move game-state command)
 
-      ([:W :A] command)
-      nil)
-    (update-in game-state [:moves] conj command)
+                      ([:W :A] command)
+                      nil)]
+      (update-in new-state [:moves] conj command))
     (execute-command game-state :W)))
 
 (defn fall-down
@@ -152,4 +164,9 @@
 (defn update-board
   [{:keys [board rocks] :as game-state}]
   (let [new-rocks (set (map (partial fall-rock board) rocks))]
-    (assoc game-state :rocks new-rocks)))
+    (-> game-state
+      ;; Insert spaces where the old rocks were
+      (assoc :board (reduce #(assoc-in board % :_) board rocks))
+      ;; And rocks where the new rocks are
+      (assoc :board (reduce #(assoc-in board % :*) board new-rocks))
+      (assoc game-state :rocks new-rocks))))
