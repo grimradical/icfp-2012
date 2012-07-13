@@ -1,4 +1,4 @@
-(ns icfp.chris-scratch)
+(ns icfp.chris-scratch.maps)
 
 (def map1
   [
