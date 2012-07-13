@@ -65,9 +65,8 @@
   [position]
   [(first position) (dec (last position))])
 
-(defn movable?
-  [game-state position]
-  ((some-fn space? earth? open-lift? lambda?) game-state position))
+(def movable?
+  (some-fn space? earth? open-lift? lambda?))
 
 (defn move-allowed?
   [{:keys [board robot-position] :as game-state} move]
@@ -75,10 +74,10 @@
     :U (movable? game-state (up robot-position))
     :D (movable? game-state (down robot-position))
     :L (or (movable? game-state (left robot-position))
-            (and (rock? game-state (left robot-position))
+           (and (rock? game-state (left robot-position))
                  (space? game-state (lleft robot-position))))
     :R (or (movable? game-state (right robot-position))
-            (and (rock? game-state (right robot-position))
+           (and (rock? game-state (right robot-position))
                  (space? game-state (rright robot-position))))))
 
 (defn command-allowed?
@@ -91,9 +90,35 @@
     :W true
     :A true))
 
+(defn move-sideways
+  [{:keys [board robot] :as game-state} direction]
+  ;; We already know the move is legal, so it's either a rock or not. If it's a
+  ;; rock, move the robot, remove the old rock, add the new rock. Otherwise
+  ;; just move the robot.
+  (if (rock? game-state (direction robot))
+    (-> game-state
+      (update-in [:robot] direction)
+      (update-in [:rocks] disj (direction robot))
+      (update-in [:rocks] conj (direction (direction robot))))
+    (update-in [:robot] direction)))
+
+(defn move
+  [{:keys [board robot] :as game-state} command]
+  (condp = command
+    :L (move-sideways game-state left)
+    :R (move-sideways game-state right)
+    :U (update-in game-state [:robot] up)
+    :D (update-in game-state [:robot] down)))
+
 (defn execute-command
   [{:keys [moves] :as game-state} command]
   (if (command-allowed? game-state command)
+    (cond
+      ([:L :R :U :D] command)
+      (move game-state command)
+
+      ([:W :A] command)
+      nil)
     (update-in game-state [:moves] conj command)
     (execute-command game-state :W)))
 
