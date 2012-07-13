@@ -22,14 +22,14 @@
   [{:keys [board]} position]
   (= (get-in board position) :>))
 
+(defn lift?
+  [{:keys [board]} position]
+  (= (get-in board position) :L))
+
 (defn open-lift?
   [{:keys [board lambdas] :as game-state} position]
   (and (empty? lambdas)
        (lift? board position)))
-
-(defn lift?
-  [{:keys [board]} position]
-  (= (get-in board position) :L))
 
 (defn width
   [board]
@@ -46,12 +46,12 @@
 (def lleft
   (comp left left))
 
-(def rright
-  (comp right right))
-
 (defn right
   [position]
   [(inc (first position)) (last position)])
+
+(def rright
+  (comp right right))
 
 (defn up
   [position]
@@ -65,7 +65,7 @@
   [game-state position]
   ((some-fn space? earth? open-lift? lambda?) game-state position))
 
-(defn move-allowed?
+(comment (defn move-allowed?
   [{:keys [board robot-position] :as game-state}]
   (condp = move
     :U (movable? game-state (up robot-position))
@@ -75,7 +75,7 @@
                  (space? game-state (lleft robot-position))))
     :R (or (movable? game-state (right robot-position))
             (and (rock? game-state (right robot-position))
-                 (space? game-state (rright robot-position))))))
+                 (space? game-state (rright robot-position)))))))
 
 (defn command-allowed?
   [{:keys [board robot-position] :as game-state} command]
