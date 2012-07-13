@@ -1,32 +1,29 @@
 (ns icfp.chris_scratch.readmap)
 
-(defn convert-char [c]
-  (keyword (str c)))
+(defn char-to-keyword [c]
+  (keyword
+    (condp = c
+      " " "_"
+      "\\" ">"
+      c)))
 
-(defn line-to-char-array [line]
-  (loop [result []
-         c (first line)
-         line (rest line)]
-    (if (empty? line) result
-      (recur
-        (concat result [(convert-char c)])
-        (first line)
-        (rest line)))))
+(defn line-to-keyword-seq [line]
+  (map char-to-keyword (map str line)))
+
+(defn read-nested-seqs [rdr]
+    (map line-to-keyword-seq (clojure.string/split-lines (slurp rdr))))
+
+(defn line-seq-to-hash [line]
+  (into {} (map-indexed #(vec [(+ 1 %1) %2]) line)))
 
 (defn read-map [rdr]
-;  (println "Entering read-map")
-;  (println
-    (loop [result []
-           line (.readLine rdr)]
-      (if (nil? line) result
-        (recur
-          (concat result [(line-to-char-array line)])
-          (.readLine rdr))))
-;  )
-;  (println "Exiting read-map")
-  )
+  (let [myarr (read-nested-seqs rdr)]
+    (into {} (map-indexed #(vec [(- (count myarr) %1) (line-seq-to-hash %2)]) myarr))))
 
-;(read-map (clojure.java.io/reader *in*))
 (with-open
-  [rdr (clojure.java.io/reader "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/map1.txt")]
+  [rdr (clojure.java.io/reader *in*)]
   (println (read-map rdr)))
+;
+;(with-open
+;  [rdr (clojure.java.io/reader "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/map1.txt")]
+;  (println (read-map rdr)))
