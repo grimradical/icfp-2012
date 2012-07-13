@@ -2,9 +2,13 @@
 
 (defstruct game-state :board :lambdas :rocks :robot :score :moves)
 
-(defn rock?
+(defn robot?
   [{:keys [board]} position]
   (= (get-in board position) :R))
+
+(defn rock?
+  [{:keys [board]} position]
+  (= (get-in board position) :*))
 
 (defn space?
   [{:keys [board]} position]
@@ -22,14 +26,14 @@
   [{:keys [board]} position]
   (= (get-in board position) :>))
 
+(defn lift?
+  [{:keys [board]} position]
+  (= (get-in board position) :L))
+
 (defn open-lift?
   [{:keys [board lambdas] :as game-state} position]
   (and (empty? lambdas)
        (lift? board position)))
-
-(defn lift?
-  [{:keys [board]} position]
-  (= (get-in board position) :L))
 
 (defn width
   [board]
@@ -46,12 +50,12 @@
 (def lleft
   (comp left left))
 
-(def rright
-  (comp right right))
-
 (defn right
   [position]
   [(inc (first position)) (last position)])
+
+(def rright
+  (comp right right))
 
 (defn up
   [position]
@@ -66,7 +70,7 @@
   ((some-fn space? earth? open-lift? lambda?) game-state position))
 
 (defn move-allowed?
-  [{:keys [board robot-position] :as game-state}]
+  [{:keys [board robot-position] :as game-state} move]
   (condp = move
     :U (movable? game-state (up robot-position))
     :D (movable? game-state (down robot-position))
@@ -86,3 +90,41 @@
     :D (move-allowed? board :D)
     :W true
     :A true))
+
+(defn execute-command
+  [{:keys [moves] :as game-state} command]
+  (if (command-allowed? game-state command)
+    (update-in game-state [:moves] conj command)
+    (execute-command game-state :W)))
+
+(defn fall-down
+  [board position]
+  (let [lower-pos (down position)]
+    (if ((some-fn space? robot?) lower-pos)
+      lower-pos)))
+
+(defn fall-right
+  [board position]
+  (let [lower-pos (down position)
+        right-pos (right position)
+        lower-right-pos (down (right position))]
+    (if (and ((some-fn rock? lambda?) lower-pos)
+             (space? right-pos)
+             (space? lower-right-pos)))))
+
+(defn fall-left
+  [board position]
+  (let [lower-pos (down position)
+        left-pos (left position)
+        lower-left-pos (down (left position))]
+    (if (and (rock? lower-pos)
+             (space? left-pos)
+             (space? lower-left-pos)))))
+
+(def fall-rock
+  (some-fn fall-down fall-right fall-left last))
+
+(defn update-board
+  [{:keys [board rocks] :as game-state}]
+  (let [new-rocks (set (map (partial fall-rock board) rocks))]
+    (assoc game-state :rocks new-rocks)))
