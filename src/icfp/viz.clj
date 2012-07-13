@@ -4,6 +4,9 @@
 
 (def sprite-size 16)
 
+(declare images)
+(declare colors)
+
 (defn draw-game
   [{:keys [board] :as game}]
   (let [trans-x #(* sprite-size %)
@@ -23,18 +26,17 @@
   [{:keys [board] :as game}]
   (fn []
     (def images {
-                 :R (load-image "/Users/deepak/Downloads/icfp/miner.bmp.gif")
-                 :* (load-image "/Users/deepak/Downloads/icfp/rock.bmp.gif")
-                 :L (load-image "/Users/deepak/Downloads/icfp/lift.bmp.gif")
-                 :O (load-image "/Users/deepak/Downloads/icfp/openlift.bmp.gif")
-                 :# (load-image "/Users/deepak/Downloads/icfp/bricks.bmp.gif")
-                 :> (load-image "/Users/deepak/Downloads/icfp/lambda.bmp.gif")
+                 :R (load-image "resources/miner.bmp.gif")
+                 :* (load-image "resources/rock.bmp.gif")
+                 :L (load-image "resources/lift.bmp.gif")
+                 :O (load-image "resources/openlift.bmp.gif")
+                 :# (load-image "resources/bricks.bmp.gif")
+                 :> (load-image "resources/lambda.bmp.gif")
                  })
 
     (def colors {:_ [0 0 0]
                  :. [226 202 202]})
-    (smooth)
-    (draw-game game)))
+    (smooth)))
 
 (defn game-to-sketch
   [game-ref]
