@@ -1,6 +1,6 @@
 (ns icfp.core)
 
-(defstruct game-state :board :lambdas :rocks :robot :score)
+(defstruct game-state :board :lambdas :rocks :robot :score :moves)
 
 (defn rock?
   [{:keys [board]} position]
@@ -68,21 +68,21 @@
 (defn move-allowed?
   [{:keys [board robot-position] :as game-state}]
   (condp = move
-    "U" (movable? game-state (up robot-position))
-    "D" (movable? game-state (down robot-position))
-    "L" (or (movable? game-state (left robot-position))
+    :U (movable? game-state (up robot-position))
+    :D (movable? game-state (down robot-position))
+    :L (or (movable? game-state (left robot-position))
             (and (rock? game-state (left robot-position))
                  (space? game-state (lleft robot-position))))
-    "R" (or (movable? game-state (right robot-position))
+    :R (or (movable? game-state (right robot-position))
             (and (rock? game-state (right robot-position))
                  (space? game-state (rright robot-position))))))
 
 (defn command-allowed?
   [{:keys [board robot-position] :as game-state} command]
   (condp = command
-    "L" (move-allowed? board "L")
-    "R" (move-allowed? board "R")
-    "U" (move-allowed? board "U")
-    "D" (move-allowed? board "D")
-    "W" true
-    "A" true))
+    :L (move-allowed? board :L)
+    :R (move-allowed? board :R)
+    :U (move-allowed? board :U)
+    :D (move-allowed? board :D)
+    :W true
+    :A true))
