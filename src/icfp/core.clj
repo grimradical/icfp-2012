@@ -3,7 +3,7 @@
 ;; lambdas - location of lambdas
 ;; rocks - location of rocks
 ;; robot - robot position
-;; lifts - location of lift
+;; lift - location of lift
 ;; moves - history of previous moves
 ;; water - current water level
 ;; flooding - current flooding rate
@@ -14,14 +14,6 @@
 (defn replace-in-set
   [s old new]
   (set (replace {old new} s)))
-
-(defn assert-game-state
-  [{:keys [board lambdas rocks robot score moves water flooding waterproof] :as game-state}]
-  (assert board)
-  (assert (every? (partial lambda? game-state) lambdas))
-  (assert (every? (partial rock? game-state) rocks))
-  (assert (robot? game-state robot))
-  true)
 
 (defn robot?
   [{:keys [board]} position]
@@ -47,10 +39,6 @@
   [{:keys [board]} position]
   (= (get-in board position) :>))
 
-(defn lift?
-  [{:keys [board]} position]
-  (= (get-in board position) :L))
-
 (defn open-lift?
   [{:keys [board] :as game-state} position]
   (= (get-in board position) :O))
@@ -58,6 +46,22 @@
 (defn closed-lift?
   [{:keys [board] :as game-state} position]
   (= (get-in board position) :L))
+
+(defn lift?
+  [{:keys [board] :as game-state} position]
+  (or (open-lift? game-state position)
+      (closed-lift? game-state position)))
+
+(defn assert-game-state
+  [{:keys [board lambdas rocks lift robot] :as game-state}]
+  (assert board)
+  (assert (every? (partial lambda? game-state) lambdas))
+  (assert (every? (partial rock? game-state) rocks))
+  (assert (or (lift? game-state lift)
+              (and (robot? game-state lift)
+                   (empty? lambdas))))
+  (assert (robot? game-state robot))
+  true)
 
 (defn width
   [board]
@@ -131,6 +135,18 @@
                     (assoc-in old-pos :_))]
     (assoc game-state :board new-board)))
 
+(defn move-rock
+  [{:keys [rocks] :as game-state} old-rock new-rock]
+  {:pre [(assert-game-state game-state)
+         (rock? game-state old-rock)]
+   :post [(assert-game-state %)
+          (space? % old-rock)
+          (rock? % new-rock)
+          (= (count rocks) (count (:rocks %)))]}
+  (-> game-state
+    (update-in [:rocks] replace-in-set old-rock new-rock)
+    (move-to-position :* old-rock new-rock)))
+
 (defn push-rock
   [{:keys [robot] :as game-state} direction]
   {:pre [(assert-game-state game-state)]
@@ -139,9 +155,7 @@
            (rock? game-state (direction robot)))
     (let [old-rock (direction robot)
           new-rock (direction old-rock)]
-      (-> game-state
-        (update-in [:rocks] replace-in-set old-rock new-rock)
-        (move-to-position :* old-rock new-rock)))
+      (move-rock game-state old-rock new-rock))
     game-state))
 
 (defn move-robot
@@ -170,10 +184,11 @@
 
 (defn collect-lambda*
   [{:keys [lambdas score] :as game-state} position]
-  {:pre [(lambda? game-state position)]
-   :post [(= (count (:lambas %)) (dec (count lambdas)))
+  {:pre [(lambda? game-state position)
+         (lambdas position)]
+   :post [(= (count (:lambdas %)) (dec (count lambdas)))
           (space? % position)
-          (if (empty (:lambdas %))
+          (if (empty? (:lambdas %))
             (open-lift? % (:lift %))
             (closed-lift? % (:lift %)))
           (= (:score %) (+ score 25))]}
@@ -218,7 +233,7 @@
 (defn fall-down
   [{:keys [board] :as game-state} position]
   (let [lower-pos (down position)]
-    (if (apply (some-fn space? robot?) [game-state lower-pos])
+    (if (space? game-state lower-pos)
       lower-pos)))
 
 (defn fall-right
@@ -226,7 +241,8 @@
   (let [lower-pos (down position)
         right-pos (right position)
         lower-right-pos (down (right position))]
-    (if (and (apply (some-fn rock? lambda?) [game-state lower-pos])
+    (if (and (or (rock? game-state lower-pos)
+                 (lambda? game-state lower-pos))
              (space? game-state right-pos)
              (space? game-state lower-right-pos))
       lower-right-pos)))
@@ -241,17 +257,26 @@
              (space? game-state lower-left-pos))
       lower-left-pos)))
 
-(def fall-rock
-  (some-fn fall-down fall-right fall-left last))
+(defn fall-rock
+  [game-state position]
+  {:pre [(rock? game-state position)]}
+  (let [possible-falls (juxt fall-down fall-right fall-left)]
+    (first (remove nil? (possible-falls game-state position)))))
 
 (defn update-board
-  [{:keys [board rocks] :as game-state}]
+  [{:keys [rocks] :as game-state}]
   {:pre [(assert-game-state game-state)]
    :post [(assert-game-state %)]}
-  (let [new-rocks (set (map (partial fall-rock game-state) rocks))]
-    (-> game-state
-      ;; Insert spaces where the old rocks were
-      (assoc :board (reduce #(assoc-in board % :_) board rocks))
-      ;; And rocks where the new rocks are
-      (assoc :board (reduce #(assoc-in board % :*) board new-rocks))
-      (assoc game-state :rocks new-rocks))))
+  (let [rock-movements (for [rock rocks
+                             :let [new-rock (fall-rock game-state rock)]
+                             :when new-rock]
+                         [rock new-rock])]
+    (reduce #(apply move-rock %1 %2) game-state rock-movements)))
+
+(defn step
+  [game-state command]
+  {:pre [(assert-game-state game-state)]
+   :post [(assert-game-state %)]}
+  (-> game-state
+    (execute-command command)
+    (update-board)))

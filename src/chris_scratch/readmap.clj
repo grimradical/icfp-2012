@@ -1,4 +1,4 @@
-(ns icfp.chris_scratch.readmap
+(ns chris_scratch.readmap
   (:require icfp.core))
 
 (def valid-map-chars #{"#" "\\" "." " " "R" "L" "*"})
@@ -141,11 +141,11 @@
          ]
     (println (clojure.string/join "\n" (map pretty-format-row rows)))))
 
-(let [game-state
+(comment (let [game-state
   ;(read-map-from-file *in*)
   (read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/contest1.map")
   ;(read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/flood5.map")
       ]
-    (print-game-state game-state))
+    (print-game-state game-state)))
 
 
