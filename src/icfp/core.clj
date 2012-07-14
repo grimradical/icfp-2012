@@ -8,7 +8,7 @@
 ;; water - current water level
 ;; flooding - current flooding rate
 ;; waterproof - how many turns the robot can stay underwater until it dies
-(defstruct game-state :board :lambdas :rocks :lift :robot :score :moves
+(defstruct game-state :board :status :lambdas :rocks :lift :robot :score :moves
     :water :flooding :waterproof)
 
 (defn replace-in-set
@@ -135,6 +135,17 @@
                     (assoc-in old-pos :_))]
     (assoc game-state :board new-board)))
 
+(defn maybe-crush-robot
+  [{:keys [status robot] :as game-state} rock]
+  {:pre [(assert-game-state game-state)]
+   :post [(assert-game-state %)
+          (not (and (#{:aborted :victory} status)
+                    (= :dead (:status %))))]}
+  (if (and (= rock (up robot))
+           (= status :alive))
+    (assoc game-state :status :dead)
+    game-state))
+
 (defn move-rock
   [{:keys [rocks] :as game-state} old-rock new-rock]
   {:pre [(assert-game-state game-state)
@@ -145,7 +156,8 @@
           (= (count rocks) (count (:rocks %)))]}
   (-> game-state
     (update-in [:rocks] replace-in-set old-rock new-rock)
-    (move-to-position :* old-rock new-rock)))
+    (move-to-position :* old-rock new-rock)
+    (maybe-crush-robot new-rock)))
 
 (defn push-rock
   [{:keys [robot] :as game-state} direction]
@@ -206,6 +218,17 @@
     (collect-lambda* game-state position)
     game-state))
 
+(defn enter-lift
+  [{:keys [status lambdas lift robot] :as game-state}]
+  {:pre [(not= (empty? lambdas)
+               (closed-lift? game-state lift))
+         (assert-game-state game-state)]
+   :post [(assert-game-state %)
+          (#{:alive :victory} (:status %))]}
+  (if (= lift robot)
+    (assoc game-state :status :victory)
+    game-state))
+
 (defn move
   [{:keys [board robot] :as game-state} command]
   {:pre [(assert-game-state game-state)]
@@ -214,7 +237,8 @@
     (-> game-state
       (push-rock direction)
       (collect-lambda (direction robot))
-      (move-robot direction))))
+      (move-robot direction)
+      (enter-lift))))
 
 (defn execute-command
   [{:keys [moves] :as game-state} command]
@@ -225,8 +249,11 @@
                       (#{:L :R :U :D} command)
                       (move game-state command)
 
-                      (#{:W :A} command)
-                      game-state)]
+                      (= :W command)
+                      game-state
+
+                      (= :A command)
+                      (assoc game-state :status :aborted))]
       (update-in new-state [:moves] conj command))
     (execute-command game-state :W)))
 
@@ -264,7 +291,7 @@
     (first (remove nil? (possible-falls game-state position)))))
 
 (defn update-board
-  [{:keys [rocks] :as game-state}]
+  [{:keys [rocks robot] :as game-state}]
   {:pre [(assert-game-state game-state)]
    :post [(assert-game-state %)]}
   (let [rock-movements (for [rock rocks
@@ -274,31 +301,48 @@
     (reduce #(apply move-rock %1 %2) game-state rock-movements)))
 
 (defn step
-  [game-state command]
-  {:pre [(assert-game-state game-state)]
+  [{:keys [status] :as game-state} command]
+  {:pre [(assert-game-state game-state)
+         (= status :alive)]
    :post [(assert-game-state %)]}
   (-> game-state
     (execute-command command)
     (update-board)))
 
+(defn compute-score
+  ([{:keys [status] :as game-state}]
+   (compute-score game-state status))
+  ([{:keys [score moves] :as game-state} status]
+   (condp = status
+     :alive
+     nil
+
+     :victory
+     ;; 50 additional points per lambda (triple).
+     (- (* score 3) (count moves))
+
+     :abort
+     ;; 25 additional points per lambda (double), and don't count the abort
+     ;; move against us.
+     (- (* score 2) (dec (count moves)))
+
+     :dead
+     (- score (count moves)))))
+
 (defn win?
-  [{:keys [lift] :as game-state}]
+  [{:keys [status] :as game-state}]
   {:pre [(assert-game-state game-state)]}
-  (robot? game-state lift))
+  (= status :victory))
 
 (defn lose?
-  [{:keys [robot rocks] :as game-state}]
+  [{:keys [status] :as game-state}]
   {:pre [(assert-game-state game-state)]}
-  (let [[x y] robot
-        rock-crushes? (for [[rx ry] rocks]
-                        (and (= x rx)
-                             (= y (inc ry))))]
-    (some true? rock-crushes?)))
+  (= status :dead))
 
 (defn aborted?
-  [{:keys [moves] :as game-state}]
+  [{:keys [status] :as game-state}]
   {:pre [(assert-game-state game-state)]}
-  (some #{:A} moves))
+  (= status :aborted))
 
 (defn game-over?
   [game-state]
