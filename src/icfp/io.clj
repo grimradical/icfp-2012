@@ -1,5 +1,5 @@
 (ns icfp.io
-  (:use [icfp.core :only [game-state]]))
+  (:use [icfp.core :only [game-state game-over? step]]))
 
 (def valid-map-chars #{"#" "\\" "." " " "R" "L" "*"})
 
@@ -142,3 +142,17 @@
          ]
     (println (clojure.string/join "\n" (map pretty-format-row rows)))))
 
+(defn drive-via-keyboard
+  [game-ref]
+  (let [keytrans {"w" :U "a" :L "d" :R "s" :D "z" :W "x" :A}]
+    (loop []
+      (if (game-over? @game-ref)
+        @game-ref
+        (let [cmd (-> (read-line)
+                      (read-string)
+                      (str)
+                      (keytrans))]
+          (when cmd
+            (dosync
+             (alter game-ref step cmd)))
+          (recur))))))
