@@ -1,6 +1,14 @@
 (ns icfp.core)
 
-(defstruct game-state :board :lambdas :rocks :robot :score :moves
+;; lambdas - location of lambdas
+;; rocks - location of rocks
+;; robot - robot position
+;; lifts - location of lift
+;; moves - history of previous moves
+;; water - current water level
+;; flooding - current flooding rate
+;; waterproof - how many turns the robot can stay underwater until it dies
+(defstruct game-state :board :lambdas :rocks :lift :robot :score :moves
     :water :flooding :waterproof)
 
 (defn replace-in-set
