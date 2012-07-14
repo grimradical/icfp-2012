@@ -48,27 +48,60 @@
 (defn metadata-lines-to-map [lines]
   (into {} (map #(vec (split-metadata-line %1)) lines)))
 
+(defn find-objects [board sym]
+  (for [[x ys] board
+        [y val] ys
+        :when (= val sym)]
+    [x y])
+  )
+
+(defn get-object-locations [board]
+  {
+    :lambdas (find-objects board :>)
+    :rocks (find-objects board :*)
+    :robot (first (find-objects board :R))
+    :lift (first (find-objects board :L))
+  }
+  )
+
+(defn build-board [rows]
+  (let [numrows (count rows)
+       row-hashes (map-indexed
+                      #(vec [(- numrows %1) (line-seq-to-hash %2)])
+                      rows)]
+      (reduce
+        (fn [result [x y val]] (assoc-in result [x y] val))
+        {}
+        (for [[y row] row-hashes
+              [x val] row]
+          [x y val]))))
+
 (defn read-game-state [rdr]
   (let [map-file-lines (get-map-file-lines rdr)
         rows (map line-to-keyword-seq (:map-lines map-file-lines))
-        numrows (count rows)
-        metadata (metadata-lines-to-map (:metadata-lines map-file-lines))]
-    (let [board (into {}
-                  (map-indexed
-                    #(vec [(- numrows %1) (line-seq-to-hash %2)])
-                    rows))
-         water (metadata "Water")
-         flooding (metadata "Flooding")
-         waterproof (metadata "Waterproof")
-         ]
+        metadata (metadata-lines-to-map (:metadata-lines map-file-lines))
+        board (build-board rows)
+        water (metadata "Water")
+        flooding (metadata "Flooding")
+        waterproof (metadata "Waterproof")
+        ; TODO: would be more efficient to do a binding or something,
+        ;  and gather information about the object locations while
+        ;  we are parsing the lines.  For now, just iterating after
+        ;  the fact.
+        object-locations (get-object-locations board)
+        ]
       (struct-map icfp.core/game-state
         :board board
+        :lambdas (:lambdas object-locations)
+        :rocks (:rocks object-locations)
+        :robot (:robot object-locations)
+        :lift (:lift object-locations)
+        :score 0
+        :moves []
         :water water
         :flooding flooding
         :waterproof waterproof
-        :score 0
-        )
-    )))
+        )))
 
 
 (defn read-game-state-from-file [path]
@@ -78,4 +111,4 @@
 
 ;(read-map-from-file *in*)
 (read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/contest1.map")
-(read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/flood5.map")
+;(read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/flood5.map")
