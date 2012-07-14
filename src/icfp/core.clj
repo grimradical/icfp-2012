@@ -280,3 +280,23 @@
   (-> game-state
     (execute-command command)
     (update-board)))
+
+(defn win?
+  [{:keys [lift] :as game-state}]
+  {:pre [(assert-game-state game-state)]}
+  (robot? game-state lift))
+
+(defn lose?
+  [{:keys [robot rocks] :as game-state}]
+  {:pre [(assert-game-state game-state)]}
+  (let [[x y] robot
+        rock-crushes? (for [[rx ry] rocks]
+                        (and (= x rx)
+                             (= y (inc ry))))]
+    (some true? rock-crushes?)))
+
+(defn game-over?
+  [game-state]
+  {:pre [(assert-game-state game-state)]}
+  (or (win? game-state)
+      (lose? game-state)))
