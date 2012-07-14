@@ -295,8 +295,14 @@
                              (= y (inc ry))))]
     (some true? rock-crushes?)))
 
+(defn aborted?
+  [{:keys [moves] :as game-state}]
+  {:pre [(assert-game-state game-state)]}
+  (some #{:A} moves))
+
 (defn game-over?
   [game-state]
   {:pre [(assert-game-state game-state)]}
-  (or (win? game-state)
+  (or (aborted? game-state)
+      (win? game-state)
       (lose? game-state)))
