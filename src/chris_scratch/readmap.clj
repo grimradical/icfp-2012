@@ -107,8 +107,45 @@
 (defn read-game-state-from-file [path]
   (with-open
     [rdr (clojure.java.io/reader path)]
-    (println (read-game-state rdr))))
+    (let [game-state (read-game-state rdr)]
+;      (println game-state)
+      game-state)))
 
-;(read-map-from-file *in*)
-(read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/contest1.map")
-;(read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/flood5.map")
+(defn convert-back-to-orig-game-char [c]
+  (condp = c
+    "_" " "
+    ">" "\\"
+    c))
+
+(defn pretty-format-row [row]
+  (clojure.string/join "" (map convert-back-to-orig-game-char (map name row))))
+
+(defn sorted-row-numbers [board]
+  (sort (keys board)))
+
+(defn columns-in-row-order [board]
+  (map #(get board %) (sorted-row-numbers board)))
+
+(defn extract-row-in [board]
+  (fn [row-number]
+    (map #(get % row-number) (columns-in-row-order board))))
+
+(defn rows-for [row-numbers board]
+  (map (extract-row-in board) row-numbers))
+
+(defn print-game-state [game-state]
+  (let [
+         board (:board game-state)
+         row-numbers-in-display-order (reverse (sorted-row-numbers board))
+         rows (rows-for row-numbers-in-display-order board)
+         ]
+    (println (clojure.string/join "\n" (map pretty-format-row rows)))))
+
+(let [game-state
+  ;(read-map-from-file *in*)
+  (read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/contest1.map")
+  ;(read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/flood5.map")
+      ]
+    (print-game-state game-state))
+
+
