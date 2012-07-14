@@ -8,7 +8,7 @@
 (declare colors)
 
 (defn draw-game
-  [{:keys [board] :as game}]
+  [{:keys [board water] :as game}]
   (let [trans-x #(* sprite-size %)
         trans-y #(* sprite-size (- (inc (core/height board)) %))]
     (fill 0 0 0)
@@ -35,7 +35,7 @@
                  })
 
     (def colors {:_ [0 0 0]
-                 :. [226 202 202]})
+                 :. [139 69 19]})
     (smooth)))
 
 (defn game-to-sketch
