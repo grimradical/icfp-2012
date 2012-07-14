@@ -224,7 +224,7 @@
                (closed-lift? game-state lift))
          (assert-game-state game-state)]
    :post [(assert-game-state %)
-          (#{:alive :dead} (:status %))]}
+          (#{:alive :victory} (:status %))]}
   (if (= lift robot)
     (assoc game-state :status :victory)
     game-state))
