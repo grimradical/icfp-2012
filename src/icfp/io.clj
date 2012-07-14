@@ -92,6 +92,7 @@
         ]
       (struct-map game-state
         :board board
+        :status :alive
         :lambdas (:lambdas object-locations)
         :rocks (:rocks object-locations)
         :robot (:robot object-locations)
