@@ -49,11 +49,10 @@
   (into {} (map #(vec (split-metadata-line %1)) lines)))
 
 (defn find-objects [board sym]
-  (println (for [[x ys] board
-                 [y val] ys
-                 :when (= val sym)]
-             [x y]))
-  []
+  (for [[x ys] board
+        [y val] ys
+        :when (= val sym)]
+    [x y])
   )
 
 (defn get-object-locations [board]
@@ -66,46 +65,31 @@
   )
 
 (defn build-board [rows]
-  (println (format "BUILD BOARD: '%s'" (seq rows)))
   (let [numrows (count rows)
        row-hashes (map-indexed
                       #(vec [(- numrows %1) (line-seq-to-hash %2)])
-                      rows)
-       result {}]
-    (println (format "NUM ROWS '%s'" numrows))
-;    (println
+                      rows)]
       (reduce
         (fn [result [x y val]] (assoc-in result [x y] val))
         {}
         (for [[y row] row-hashes
               [x val] row]
-          [x y val]))
-;    )
-;             (do
-;                (assoc-in result [x y] val)
-;                [x y val])))
-;    result
-    ))
+          [x y val]))))
 
 (defn read-game-state [rdr]
   (let [map-file-lines (get-map-file-lines rdr)
         rows (map line-to-keyword-seq (:map-lines map-file-lines))
-        numrows (count rows)
-        metadata (metadata-lines-to-map (:metadata-lines map-file-lines))]
-;    (let [board (into {}
-;      (map-indexed
-;                    #(vec [(- numrows %1) (line-seq-to-hash %2)])
-;                    rows))
-      (let [board (build-board rows)
-         water (metadata "Water")
-         flooding (metadata "Flooding")
-         waterproof (metadata "Waterproof")
-         ; TODO: would be more efficient to do a binding or something,
-         ;  and gather information about the object locations while
-         ;  we are parsing the lines.  For now, just iterating after
-         ;  the fact.
-         object-locations (get-object-locations board)
-         ]
+        metadata (metadata-lines-to-map (:metadata-lines map-file-lines))
+        board (build-board rows)
+        water (metadata "Water")
+        flooding (metadata "Flooding")
+        waterproof (metadata "Waterproof")
+        ; TODO: would be more efficient to do a binding or something,
+        ;  and gather information about the object locations while
+        ;  we are parsing the lines.  For now, just iterating after
+        ;  the fact.
+        object-locations (get-object-locations board)
+        ]
       (struct-map icfp.core/game-state
         :board board
         :lambdas (:lambdas object-locations)
@@ -117,8 +101,7 @@
         :water water
         :flooding flooding
         :waterproof waterproof
-        )
-    )))
+        )))
 
 
 (defn read-game-state-from-file [path]
@@ -128,4 +111,4 @@
 
 ;(read-map-from-file *in*)
 (read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/contest1.map")
-(read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/flood5.map")
+;(read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/flood5.map")
