@@ -1,5 +1,5 @@
-(ns chris_scratch.readmap
-  (:require icfp.core))
+(ns icfp.io
+  (:use [icfp.core :only [game-state]]))
 
 (def valid-map-chars #{"#" "\\" "." " " "R" "L" "*"})
 
@@ -90,7 +90,7 @@
         ;  the fact.
         object-locations (get-object-locations board)
         ]
-      (struct-map icfp.core/game-state
+      (struct-map game-state
         :board board
         :lambdas (:lambdas object-locations)
         :rocks (:rocks object-locations)
@@ -140,12 +140,4 @@
          rows (rows-for row-numbers-in-display-order board)
          ]
     (println (clojure.string/join "\n" (map pretty-format-row rows)))))
-
-(comment (let [game-state
-  ;(read-map-from-file *in*)
-  (read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/contest1.map")
-  ;(read-game-state-from-file "/home/cprice/work/puppet/icfp/icfp-2012/resources/maps/flood5.map")
-      ]
-    (print-game-state game-state)))
-
 
