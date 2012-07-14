@@ -49,11 +49,11 @@
   (into {} (map #(vec (split-metadata-line %1)) lines)))
 
 (defn find-objects [board sym]
-  (for [[x ys] board
-        [y val] ys
-        :when (= val sym)]
-    [x y])
-  )
+  (into #{}
+    (for [[x ys] board
+          [y val] ys
+          :when (= val sym)]
+      [x y])))
 
 (defn get-object-locations [board]
   {
