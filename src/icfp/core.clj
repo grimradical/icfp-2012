@@ -403,3 +403,8 @@
                 (= :_ (get-in board [(inc x) y]))))
 
     false))
+
+(defn rock-immovable?
+  [game-state pos]
+  {:pre [(rock? game-state pos)]}
+  (immovable? game-state pos))
