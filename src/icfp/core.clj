@@ -377,3 +377,11 @@
   (if (zero? n)
     (= :dead (:status game-state))
     (recur (step game-state :W) (dec n))))
+
+(defn lookahead
+  ([game-state n]
+     (turns-from-now game-state n (repeat n :W)))
+  ([game-state n moves]
+     (if (zero? n)
+       game-state
+       (recur (step game-state (first moves)) (dec n) (rest moves)))))

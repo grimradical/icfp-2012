@@ -110,18 +110,54 @@
 
 (defn closest
   [pos candidates]
-  {:pre  [candidates]
-   :post [(some #{%} candidates)]}
-  (let [dists    (into {} (for [c candidates]
-                                   [(manhattan-distance pos c) c]))
-        min-dist (apply min (keys dists))]
-    (dists min-dist)))
+  {:pre  [candidates]}
+  (let [dists        (for [c candidates]
+                       [(manhattan-distance pos c) c])
+        dists        (sort dists)
+        [min-dist _] (first dists)]
+    (map second
+         (filter #(= (first %) min-dist) dists))))
 
 
 (defn valid-dest?
   [{:keys [lambdas lift] :as game-state} pos]
   (or (some #{pos} lambdas)
       (= lift pos)))
+
+(defn stupid-2-cost
+  [p {:keys [robot score rocks board moves] :as g} dest]
+  (let [dist       (manhattan-distance robot dest)
+        dead       (if (lose? g) 5000 0)
+        win        (if (win? g) -5000 0)
+        s          (- 0 score)
+        backtrack  (let [[m1 m2] (take 2 (reverse moves))]
+                     (if (= m1 (invert-move m2)) 10 0))
+        below-rock (let [[rx ry] robot
+                         above (get-in board [rx (inc ry)])]
+                     (if (= :* above)
+                       1000
+                       0))
+        rocks-moved (if (= (:rocks p) rocks)
+                      0
+                      1000)
+        ]
+    (+ dist dead win s backtrack below-rock)))
+
+(defn stupid-2
+  [{:keys [robot lambdas lift] :as g}]
+  (let [dest  (first (closest robot lambdas))
+        costs (for [m [:U :D :L :R]
+                    :when (move-allowed? g m)]
+                [(stupid-2-cost g (step g m) dest) m])
+        costs (sort costs)
+        dir   (second (first costs))
+        ]
+    (prn)
+    (prn costs)
+    (prn dir)
+    (prn robot)
+    (-> g
+        (step dir))))
 
 (defn stupid-1
   [{:keys [robot lambdas lift moves visited prev-dest] :as game-state :or {visited []}}]
@@ -146,7 +182,6 @@
         preferred-moves (filter move-preferred? ordered-moves)
         possible-moves  (filter move-ok? ordered-moves)
         dir             (or (first preferred-moves)
-                            (first possible-moves)
                             :A)
         seen            (if (empty? preferred-moves)
                           [robot]
@@ -234,11 +269,11 @@
 (defn run-ai
   [f game-ref]
   (loop [n 0]
-    ;;(Thread/sleep 800)
+    (Thread/sleep 200)
     (if-not (game-over? @game-ref)
       (do
         (dosync
          (ref-set game-ref (f @game-ref)))
-        (if (< n 200)
+        (if (< n 1)
           (recur (inc n))))
       @game-ref)))
