@@ -135,6 +135,8 @@
     (map second
          (filter #(= (first %) min-dist) dists))))
 
+(def invert-move {:U :D, :D :U, :L :R, :R :L, :W :W})
+
 (defn stupid-2-cost
   [p {:keys [robot score rocks board moves] :as g} dest]
   (let [dist       (manhattan-distance robot dest)
