@@ -52,7 +52,7 @@
           remove-illegal-commands (fn [game-state goal commands]
                                     (filter #(command-allowed? game-state %) commands))
           command-rules [giveup-if-blocked flee-from-doom remove-illegal-commands]
-          commands (reduce #(%2 game-state goal %1) #{:L :R :U :D :A} command-rules)]
+          commands (reduce #(%2 game-state goal %1) #{:L :R :U :D} command-rules)]
       (for [command commands]
         (step game-state command)))))
 
@@ -105,7 +105,6 @@
         f {start f1}
         open (priority-map-by a*-priority-function)]
     (if current
-      ;;(prn (:robot current))
       (if (goal? current goal)
         current
         (let [new-closed (conj closed (:board current))
@@ -115,14 +114,16 @@
                                              (< (g %) (+ (g current) (cost-fn current %)))))
                                    neighbors)
               g (reduce conj g (for [neighbor improvements
-                                     :let [backtracking-penalty (if (opposite? (last (:moves current)) (last (:moves neighbor))) 0 0)]]
+                                     :let [backtracking-penalty (if (opposite? (last (:moves current)) (last (:moves neighbor))) 1000 0)]]
                                  [neighbor (+ g1 (cost-fn current neighbor) backtracking-penalty)]))
               f (reduce conj f (for [neighbor improvements]
                                  [neighbor (+ (g neighbor) (cost-fn neighbor goal))]))
               new-open (reduce conj open (for [neighbor improvements]
                                            [neighbor [(f neighbor) (g neighbor) (cost-fn neighbor goal)]]))]
           (recur new-closed (first new-open) g f (if (not (empty? new-open)) (pop new-open)))))
-      (throw (RuntimeException. (format "Failed to find a route from %s to %s" (:robot start) (:robot goal)))))))
+      ;; If we can't find a route to the target, leave us where we are so we
+      ;; can skip that target
+      start)))
 
 (defn closest
   [pos candidates]
@@ -211,33 +212,40 @@
   (let [edge-fn edges
         cost-fn (fn [a b]
                   (cond
-                    ;; We want to try not to block the goal. We'd rather do
-                    ;; that than die or abort, though.
-                    (position-blocked? (wait-n-turns a 10) (:robot b))
-                    10000
-
-                    ;; It's even worse to block the lift than our own target!
-                    (position-blocked? (wait-n-turns a 10) (:lift a))
-                    100000
-
-                    ;; If we can't win, aborting is a good alternative
-                    (aborted? a)
-                    1000000
-
                     ;; If we can't win OR abort (we're already dead), then we
                     ;; need to count this as done as well
                     (lose? a)
                     10000000
 
+                    ;; If we can't win, aborting is a good alternative
+                    ;; (aborted? a)
+                    ;; 1000000
+
+                    ;; It's even worse to block the lift than our own target!
+                    (position-blocked? (wait-n-turns a 10) (:lift a))
+                    100000
+
+                    ;; We want to try not to block the goal. We'd rather do
+                    ;; that than die or abort, though.
+                    (position-blocked? (wait-n-turns a 10) (:robot b))
+                    10000
+
                     :else
                     (manhattan-distance (:robot a) (:robot b))))
         goal? (fn [curr goal]
                 (or (= (:robot curr) (:robot goal))
-                    (aborted? curr)))]
-    (reduce (fn [start goal]
-              (let [result (a* edge-fn cost-fn goal? start {:robot goal})]
-                (println (str "Path so far: " (clojure.string/join (map name (:moves result)))))
-                result)) game-state targets)))
+                    (aborted? curr)
+                    (lose? curr)))]
+    (let [solution (reduce (fn [start goal]
+                             (let [result (a* edge-fn cost-fn goal? start {:robot goal})]
+                               (println (str "Path so far: " (clojure.string/join (map name (:moves result)))))
+                               result)) game-state targets)]
+      ;; Make sure the game is completely done, for scoring purposes. It might
+      ;; be still alive if we decided to skip all our targets, in which case we
+      ;; want to abort.
+      (if (game-over? solution)
+        solution
+        (step solution :A)))))
 
 (comment (defn a*-ai
   [{:keys [robot lambdas lift] :as game-state}]
