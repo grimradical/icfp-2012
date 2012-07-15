@@ -60,6 +60,30 @@
     (conj (reconstruct-path came-from previous) current)
     [current]))
 
+(defn hamiltonian
+  ([vertices]
+   {:pre [(sequential? vertices)
+          (every? vector? vertices)]}
+   (let [edges (into (priority-map)
+                     (for [a vertices
+                           b vertices
+                           :when (not= a b)]
+                       [[a b] (manhattan-distance a b)]))]
+     (hamiltonian vertices edges)))
+  ([vertices edges]
+   {:post [(= (count vertices) (count %))]}
+   (loop [path []
+          current (first vertices)
+          remaining-edges edges]
+     ;; Find the closest remaining vertex to us. Drop all the edges that aren't
+     ;; from us and then take the first that's left, which should be the
+     ;; shortest.
+     (if current
+       (let [[[_ next] cost] (first (drop-while #(not= current (ffirst %)) remaining-edges))]
+         ;; Remove all the edges that are to or from the current vertex now.
+         (recur (conj path current) next (remove #(or (= (first (key %)) current) (= (second (key %)) current)) remaining-edges)))
+       path))))
+
 (defn a*
   [edge-fn cost-fn goal? start goal]
   (loop [closed #{}
@@ -166,19 +190,38 @@
           (recur (concat path (:moves result)) result next-goals))
         path)))))
 
-(defn a*-lambdas
-  [game-state lambdas]
+(defn a*-targets
+  [game-state targets]
   (let [edge-fn edges
         cost-fn #(manhattan-distance (:robot %1) (:robot %2))
         goal? #(= (:robot %1) (:robot %2))]
-    (reduce #(a* edge-fn cost-fn goal? %1 {:robot %2}) game-state lambdas)))
+    (reduce #(a* edge-fn cost-fn goal? %1 {:robot %2}) game-state targets)))
 
 (defn a*-ai
   [{:keys [robot lambdas lift] :as game-state}]
-  (let [results (take 1 (map #(a*-lambdas game-state %) (map #(concat % [lift]) (permutations lambdas))))]
-    (last (into (sorted-map)
-                (for [result results]
-                  [(compute-score result) result])))))
+  (let [edge-fn edges
+        cost-fn #(manhattan-distance (:robot %1) (:robot %2))
+        goal? #(= (:robot %1) (:robot %2))]
+  (loop [current game-state
+         remaining lambdas]
+    (if (seq remaining)
+      (let [results (into (sorted-map)
+                          (for [state (map #(a* edge-fn cost-fn goal? current {:robot %}) remaining)]
+                            [(compute-score state) state]))
+            state (val (first results))]
+        (recur state (:lambdas state)))
+      (if (open-lift? current (:lift current))
+        (let [state (a* edge-fn cost-fn goal? current {:robot (:lift current)})]
+          [(compute-score state) state])
+        [(compute-score current) current])))))
+
+(comment (defn a*-ai
+  [{:keys [robot lambdas lift] :as game-state}]
+  (let [strategy (hamiltonian (cons robot lambdas))
+        ;; Take the rest because the first one is the robot, and add the lift
+        targets (concat (rest strategy) [lift])
+        result (a*-targets game-state targets)]
+    [(compute-score result) result])))
 
 (defn run-ai-vector
   [moves game-ref]
