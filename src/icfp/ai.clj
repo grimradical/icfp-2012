@@ -41,7 +41,11 @@
   [{:keys [robot] :as game-state} goal]
   (when-not (game-over? game-state)
     ;; Don't even bother if we can't get to the goal
-    (let [giveup-if-blocked (fn [game-state goal commands]
+    (let [giveup-if-lift-closed (fn [game-state goal commands]
+                                  (if (closed-lift? game-state (:robot goal))
+                                    (apply disj commands #{:L :R :U :D})
+                                    commands))
+          giveup-if-blocked (fn [game-state goal commands]
                               (if (position-blocked? game-state (:robot goal))
                                 (apply disj commands #{:L :R :U :D})
                                 commands))
@@ -51,7 +55,10 @@
                              commands))
           remove-illegal-commands (fn [game-state goal commands]
                                     (filter #(command-allowed? game-state %) commands))
-          command-rules [giveup-if-blocked flee-from-doom remove-illegal-commands]
+          command-rules [giveup-if-lift-closed
+                         giveup-if-blocked
+                         flee-from-doom
+                         remove-illegal-commands]
           commands (reduce #(%2 game-state goal %1) #{:L :R :U :D} command-rules)]
       (for [command commands]
         (step game-state command)))))
@@ -107,9 +114,10 @@
     (if current
       (if (goal? current goal)
         current
-        (let [new-closed (conj closed (:board current))
+        (let [dedup-state #((juxt :robot :rocks :lambdas :lift) %)
+              new-closed (conj closed (dedup-state current))
               neighbors (edge-fn current goal)
-              improvements (remove #(or (new-closed (:board %))
+              improvements (remove #(or (new-closed (dedup-state %))
                                         (and (open %)
                                              (< (g %) (+ (g current) (cost-fn current %)))))
                                    neighbors)

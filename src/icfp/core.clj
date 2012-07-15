@@ -359,20 +359,6 @@
    [x (inc y)]
    [x (dec y)]])
 
-(defn position-blocked?
-  [{:keys [board] :as game-state} pos]
-  (let [liberty? #(#{:_ :. :> :R} (get-in board %))
-        candidates (surrounding-coords pos)]
-    (empty? (filter liberty? candidates))))
-
-(defn lift-blocked?
-  [{:keys [lift] :as game-state}]
-  (position-blocked? game-state lift))
-
-(defn any-lambda-blocked?
-  [{:keys [lambdas] :as game-state}]
-  (some identity (map #(position-blocked? game-state %) lambdas)))
-
 (defn wait-n-turns
   [game-state n]
   (if (zero? n)
@@ -414,3 +400,19 @@
 (defn rock-immovable?
   [game-state pos]
   (not (rock-movable? game-state pos)))
+
+(defn position-blocked?
+  [{:keys [board] :as game-state} pos]
+  (let [liberty? #(or (#{:_ :. :> :R} (get-in board %))
+                      (and (rock? game-state %)
+                           (rock-movable? game-state %)))
+        candidates (surrounding-coords pos)]
+    (empty? (filter liberty? candidates))))
+
+(defn lift-blocked?
+  [{:keys [lift] :as game-state}]
+  (position-blocked? game-state lift))
+
+(defn any-lambda-blocked?
+  [{:keys [lambdas] :as game-state}]
+  (some identity (map #(position-blocked? game-state %) lambdas)))
