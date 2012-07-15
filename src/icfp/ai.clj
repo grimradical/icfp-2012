@@ -38,11 +38,23 @@
     [f g h]))
 
 (defn edges
-  [game-state]
+  [{:keys [robot] :as game-state} goal]
   (when-not (game-over? game-state)
-    (for [command #{:L :R :U :D :A}
-          :when (command-allowed? game-state command)]
-      (step game-state command))))
+    ;; Don't even bother if we can't get to the goal
+    (let [giveup-if-blocked (fn [game-state goal commands]
+                              (if (position-blocked? game-state (:robot goal))
+                                (apply disj commands #{:L :R :U :D})
+                                commands))
+          flee-from-doom (fn [game-state goal commands]
+                           (if (rock? game-state (up robot))
+                             (disj commands :D)
+                             commands))
+          remove-illegal-commands (fn [game-state goal commands]
+                                    (filter #(command-allowed? game-state %) commands))
+          command-rules [giveup-if-blocked flee-from-doom remove-illegal-commands]
+          commands (reduce #(%2 game-state goal %1) #{:L :R :U :D :A} command-rules)]
+      (for [command commands]
+        (step game-state command)))))
 
 (def a*-priority-function
   (fn [x y]
@@ -86,27 +98,31 @@
 
 (defn a*
   [edge-fn cost-fn goal? start goal]
+  (println (format "Navigating from %s to %s" (:robot start) (:robot goal)))
   (loop [closed #{}
         [current [f1 g1 h1]] [start [(cost-fn start goal) 0 (cost-fn start goal)]]
         g {start g1}
         f {start f1}
         open (priority-map-by a*-priority-function)]
-    (when current
+    (if current
+      ;;(prn (:robot current))
       (if (goal? current goal)
         current
-        (let [new-closed (conj closed current)
-              neighbors (edge-fn current)
-              improvements (remove #(or (new-closed %)
+        (let [new-closed (conj closed (:board current))
+              neighbors (edge-fn current goal)
+              improvements (remove #(or (new-closed (:board %))
                                         (and (open %)
                                              (< (g %) (+ (g current) (cost-fn current %)))))
                                    neighbors)
-              g (reduce conj g (for [neighbor improvements]
-                                 [neighbor (+ g1 (cost-fn current neighbor))]))
+              g (reduce conj g (for [neighbor improvements
+                                     :let [backtracking-penalty (if (opposite? (last (:moves current)) (last (:moves neighbor))) 0 0)]]
+                                 [neighbor (+ g1 (cost-fn current neighbor) backtracking-penalty)]))
               f (reduce conj f (for [neighbor improvements]
                                  [neighbor (+ (g neighbor) (cost-fn neighbor goal))]))
               new-open (reduce conj open (for [neighbor improvements]
                                            [neighbor [(f neighbor) (g neighbor) (cost-fn neighbor goal)]]))]
-          (recur new-closed (first new-open) g f (if (not (empty? new-open)) (pop new-open))))))))
+          (recur new-closed (first new-open) g f (if (not (empty? new-open)) (pop new-open)))))
+      (throw (RuntimeException. (format "Failed to find a route from %s to %s" (:robot start) (:robot goal)))))))
 
 (defn closest
   [pos candidates]
@@ -193,11 +209,37 @@
 (defn a*-targets
   [game-state targets]
   (let [edge-fn edges
-        cost-fn #(manhattan-distance (:robot %1) (:robot %2))
-        goal? #(= (:robot %1) (:robot %2))]
-    (reduce #(a* edge-fn cost-fn goal? %1 {:robot %2}) game-state targets)))
+        cost-fn (fn [a b]
+                  (cond
+                    ;; We want to try not to block the goal. We'd rather do
+                    ;; that than die or abort, though.
+                    (position-blocked? (wait-n-turns a 10) (:robot b))
+                    10000
 
-(defn a*-ai
+                    ;; It's even worse to block the lift than our own target!
+                    (position-blocked? (wait-n-turns a 10) (:lift a))
+                    100000
+
+                    ;; If we can't win, aborting is a good alternative
+                    (aborted? a)
+                    1000000
+
+                    ;; If we can't win OR abort (we're already dead), then we
+                    ;; need to count this as done as well
+                    (lose? a)
+                    10000000
+
+                    :else
+                    (manhattan-distance (:robot a) (:robot b))))
+        goal? (fn [curr goal]
+                (or (= (:robot curr) (:robot goal))
+                    (aborted? curr)))]
+    (reduce (fn [start goal]
+              (let [result (a* edge-fn cost-fn goal? start {:robot goal})]
+                (println (str "Path so far: " (clojure.string/join (map name (:moves result)))))
+                result)) game-state targets)))
+
+(comment (defn a*-ai
   [{:keys [robot lambdas lift] :as game-state}]
   (let [edge-fn edges
         cost-fn #(manhattan-distance (:robot %1) (:robot %2))
@@ -213,15 +255,15 @@
       (if (open-lift? current (:lift current))
         (let [state (a* edge-fn cost-fn goal? current {:robot (:lift current)})]
           [(compute-score state) state])
-        [(compute-score current) current])))))
+        [(compute-score current) current]))))))
 
-(comment (defn a*-ai
+(defn a*-ai
   [{:keys [robot lambdas lift] :as game-state}]
   (let [strategy (hamiltonian (cons robot lambdas))
         ;; Take the rest because the first one is the robot, and add the lift
         targets (concat (rest strategy) [lift])
         result (a*-targets game-state targets)]
-    [(compute-score result) result])))
+    [(compute-score result) result]))
 
 (defn run-ai-vector
   [moves game-ref]

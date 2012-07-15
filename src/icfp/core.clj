@@ -54,7 +54,8 @@
 
 (defn assert-game-state
   [{:keys [board lambdas rocks lift robot] :as game-state}]
-  (assert board)
+  (assert (map? game-state))
+  (assert (map? board))
   (assert (every? (partial lambda? game-state) lambdas))
   (assert (every? (partial rock? game-state) rocks))
   (assert (or (lift? game-state lift)
@@ -321,7 +322,7 @@
      ;; 50 additional points per lambda (triple).
      (- (* score 3) (count moves))
 
-     :abort
+     :aborted
      ;; 25 additional points per lambda (double), and don't count the abort
      ;; move against us.
      (- (* score 2) (dec (count moves)))
@@ -360,7 +361,7 @@
 
 (defn position-blocked?
   [{:keys [board] :as game-state} pos]
-  (let [liberty? #(#{:_ :. :>} (get-in board %))
+  (let [liberty? #(#{:_ :. :> :R} (get-in board %))
         candidates (surrounding-coords pos)]
     (empty? (filter liberty? candidates))))
 
@@ -372,8 +373,20 @@
   [{:keys [lambdas] :as game-state}]
   (some identity (map #(position-blocked? game-state %) lambdas)))
 
-(defn death-sentence?
+(defn wait-n-turns
   [game-state n]
   (if (zero? n)
-    (= :dead (:status game-state))
-    (recur (step game-state :W) (dec n))))
+    game-state
+    (let [next-state (if (game-over? game-state)
+                        game-state
+                        (step game-state :W))]
+      (recur next-state (dec n)))))
+
+(defn death-sentence?
+  [game-state n]
+  (= :dead (:status (wait-n-turns n))))
+
+(defn opposite?
+  [d1 d2]
+  (let [opposites #{[:L :R] [:R :L] [:U :D] [:D :U]}]
+    (opposites [d1 d2])))
