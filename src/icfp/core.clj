@@ -391,6 +391,16 @@
   (let [opposites #{[:L :R] [:R :L] [:U :D] [:D :U]}]
     (opposites [d1 d2])))
 
+(defn rock-movable?
+  [{:keys [board] :as game-state} [x y :as pos]]
+  {:pre [(rock? game-state pos)]}
+  ;; A rock is movable if there an empty space next to it, of if just
+  ;; waiting a turn causes it to change position on its own (sliding)
+  (or (or (= :_ (get-in board [(dec x) y]))
+          (= :_ (get-in board [(inc x) y])))
+      (let [future (step game-state :W)]
+        (= :* (get-in (:board future) pos)))))
+
 (defn immovable?
   [{:keys [board] :as game-state} [x y :as pos]]
   (condp = (get-in board pos)
@@ -398,13 +408,9 @@
     :O true
     :# true
     :> true
-
-    :* (not (or (= :_ (get-in board [(dec x) y]))
-                (= :_ (get-in board [(inc x) y]))))
-
+    :* (not (rock-movable? game-state pos))
     false))
 
 (defn rock-immovable?
   [game-state pos]
-  {:pre [(rock? game-state pos)]}
-  (immovable? game-state pos))
+  (not (rock-movable? game-state pos)))
