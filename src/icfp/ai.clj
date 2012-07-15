@@ -151,24 +151,29 @@
                       0
                       1000)
         ]
-    (+ dist dead win s backtrack below-rock)))
+    (+ dist dead win s backtrack below-rock rocks-moved)))
 
 (defn stupid-2
   [{:keys [current-goal robot lambdas lift] :as g}]
   (let [dest  (first (closest robot lambdas))
         costs (for [m [:U :D :L :R]
-                    :when (move-allowed? g m)]
-                [(stupid-2-cost g (step g m) dest) m])
+                    :when (move-allowed? g m)
+                    :let [f (step g m)]]
+                [(stupid-2-cost g f dest) (:robot f) m])
         costs (sort costs)
-        dir   (second (first costs))
+        dir   (nth (first costs) 2)
+        overlays (into {} (for [[cost pos _] costs]
+                            [pos cost]))
         ]
     (prn)
     (prn current-goal)
     (prn costs)
     (prn dir)
     (prn robot)
+    (prn overlays)
     (-> g
         (assoc :current-goal dest)
+        (assoc :overlays overlays)
         (step dir))))
 
 (defn run-sequence
@@ -268,7 +273,7 @@
       (do
         (dosync
          (ref-set game-ref (f @game-ref)))
-        (if (< n 1000)
+        (if (< n 100)
           (recur (inc n))
           (prn "Terminating early")))
       @game-ref)))
