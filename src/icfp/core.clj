@@ -350,3 +350,30 @@
   (or (aborted? game-state)
       (win? game-state)
       (lose? game-state)))
+
+(defn surrounding-coords
+  [[x y]]
+  [[(inc x) y]
+   [(dec x) y]
+   [x (inc y)]
+   [x (dec y)]])
+
+(defn position-blocked?
+  [{:keys [board] :as game-state} pos]
+  (let [liberty? #(#{:_ :. :>} (get-in board %))
+        candidates (surrounding-coords pos)]
+    (empty? (filter liberty? candidates))))
+
+(defn lift-blocked?
+  [{:keys [lift] :as game-state}]
+  (position-blocked? game-state lift))
+
+(defn any-lambda-blocked?
+  [{:keys [lambdas] :as game-state}]
+  (some identity (map #(position-blocked? game-state %) lambdas)))
+
+(defn death-sentence?
+  [game-state n]
+  (if (zero? n)
+    (= :dead (:status game-state))
+    (recur (step game-state :W) (dec n))))
