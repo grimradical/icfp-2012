@@ -19,6 +19,9 @@
                             (= [x y] current-goal)
                             :goal)]]
 
+      (stroke-weight 0.5)
+      (stroke 100 100 100)
+
       (when-let [i (images obj)]
         (image i (- xp sprite-size) (- yp sprite-size)))
 
@@ -31,7 +34,7 @@
         (no-fill)
         (apply stroke c)
         (stroke-weight 3)
-        (rect (- xp sprite-size) (- yp sprite-size) 16 16)
+        (rect (- xp sprite-size) (- yp sprite-size) 14 14)
         (no-stroke)))))
 
 (defn setup-with-game
