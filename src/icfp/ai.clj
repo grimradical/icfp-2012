@@ -13,6 +13,23 @@
   (+ (Math/abs (- x2 x1))
      (Math/abs (- y2 y1))))
 
+(defn directions-from
+  [[x1 y1] [x2 y2]]
+  (let [dirs {[:= :=] [:W]
+              [:= :>] [:U]
+              [:= :<] [:D]
+              [:> :=] [:R]
+              [:> :>] [:U :R]
+              [:> :<] [:D :R]
+              [:< :=] [:L]
+              [:< :>] [:U :L]
+              [:< :<] [:D :L]}
+        cmp  (fn [a b] (cond
+                         (= a b) :=
+                         (> a b) :>
+                         :else :<))]
+    (dirs [(cmp x2 x1) (cmp y2 y1)])))
+
 (defn cost
   [current start end]
   (let [g (manhattan-distance start current)
@@ -21,11 +38,11 @@
     [f g h]))
 
 (defn edges
-  [{:keys [board robot] :as game-state} [x y]]
-  (for [[tx ty] [[(dec x) y] [(inc x) y] [x (dec y)] [x (inc y)]]
-        :when (and (not= [x y] [tx ty])
-                   (movable? game-state [tx ty]))]
-    [tx ty]))
+  [game-state]
+  (when-not (game-over? game-state)
+    (for [command #{:L :R :U :D :A}
+          :when (command-allowed? game-state command)]
+      (step game-state command))))
 
 (def a*-priority-function
   (fn [x y]
@@ -44,33 +61,28 @@
     [current]))
 
 (defn a*
-  [{:keys [board] :as game-state} start end]
+  [edge-fn cost-fn goal? start goal]
   (loop [closed #{}
-        [current [f1 g1 h1]] [start [(manhattan-distance start end) 0 (manhattan-distance start end)]]
+        [current [f1 g1 h1]] [start [(cost-fn start goal) 0 (cost-fn start goal)]]
         g {start g1}
         f {start f1}
-        open (priority-map-by a*-priority-function)
-        came-from {}]
-    (if current
-      (if (= current end)
-        (reconstruct-path came-from end)
+        open (priority-map-by a*-priority-function)]
+    (when current
+      (if (goal? current goal)
+        current
         (let [new-closed (conj closed current)
-              neighbors (remove new-closed (edges game-state current))
-              ;;_ (prn current)
-              ;;_ (prn neighbors)
-              ;;_ (prn "neighbors" neighbors)
-              improvements (filter #(or (not (open %))
-                                        (< (inc g1) (g %)))
+              neighbors (edge-fn current)
+              improvements (remove #(or (new-closed %)
+                                        (and (open %)
+                                             (< (g %) (+ (g current) (cost-fn current %)))))
                                    neighbors)
-              ;;_ (prn "improvements" (map vector improvements (map (constantly (inc g1)) improvements) (map g improvements)))
-              came-from (reduce #(conj %1 [%2 current]) came-from improvements)
               g (reduce conj g (for [neighbor improvements]
-                                 [neighbor (+ g1 (manhattan-distance current neighbor))]))
+                                 [neighbor (+ g1 (cost-fn current neighbor))]))
               f (reduce conj f (for [neighbor improvements]
-                                 [neighbor (+ (g neighbor) (manhattan-distance neighbor end))]))
+                                 [neighbor (+ (g neighbor) (cost-fn neighbor goal))]))
               new-open (reduce conj open (for [neighbor improvements]
-                                           [neighbor [(f neighbor) (g neighbor) (manhattan-distance neighbor end)]]))]
-          (recur new-closed (first new-open) g f (if (not (empty? new-open)) (pop new-open)) came-from))))))
+                                           [neighbor [(f neighbor) (g neighbor) (cost-fn neighbor goal)]]))]
+          (recur new-closed (first new-open) g f (if (not (empty? new-open)) (pop new-open))))))))
 
 (defn closest
   [pos candidates]
@@ -81,22 +93,6 @@
         min-dist (apply min (keys dists))]
     (dists min-dist)))
 
-(defn directions-from
-  [[x1 y1] [x2 y2]]
-  (let [dirs {[:= :=] [:W]
-              [:= :>] [:U]
-              [:= :<] [:D]
-              [:> :=] [:R]
-              [:> :>] [:U :R]
-              [:> :<] [:D :R]
-              [:< :=] [:L]
-              [:< :>] [:U :L]
-              [:< :<] [:D :L]}
-        cmp  (fn [a b] (cond
-                         (= a b) :=
-                         (> a b) :>
-                         :else :<))]
-    (dirs [(cmp x2 x1) (cmp y2 y1)])))
 
 (defn valid-dest?
   [{:keys [lambdas lift] :as game-state} pos]
@@ -157,27 +153,31 @@
         (recur new-state (rest moves))))
     game-state))
 
-(defn route-to-lift
-  [{:keys [robot lift] :as game-state}]
-  (a* game-state robot lift))
+(comment (defn a*-lambdas
+  [{:keys [robot lift] :as game-state} lambdas]
+  (let [edge-fn edges
+        cost-fn #(manhattan-distance (:robot %1) (:robot %2))
+        goal? #(= (:robot %1) (:robot %2))]
+    (loop [path []
+           start game-state
+           [goal & next-goals] lambdas]
+      (if goal
+        (let [result (a* edge-fn cost-fn goal? start end)]
+          (recur (concat path (:moves result)) result next-goals))
+        path)))))
 
 (defn a*-lambdas
-  [{:keys [robot lift] :as game-state} lambdas]
-  (let [plan   (mapcat #(a* game-state %1 %2) (cons robot lambdas) lambdas)
-        moves  (mapcat directions-from plan (rest plan))]
-        (run-sequence game-state (remove #(= :W %) moves))))
+  [game-state lambdas]
+  (let [edge-fn edges
+        cost-fn #(manhattan-distance (:robot %1) (:robot %2))
+        goal? #(= (:robot %1) (:robot %2))]
+    (reduce #(a* edge-fn cost-fn goal? %1 {:robot %2}) game-state lambdas)))
 
 (defn a*-ai
   [{:keys [robot lambdas lift] :as game-state}]
-  (let [intermediates (pmap #(a*-lambdas game-state %) (permutations lambdas))
-        finals (map (fn [game-state]
-                      (if (game-over? game-state)
-                        game-state
-                        (let [plan (route-to-lift game-state)
-                              moves (mapcat directions-from plan (rest plan))]
-                          (run-sequence game-state (remove #(= :W %) moves))))) intermediates)]
+  (let [results (take 1 (map #(a*-lambdas game-state %) (map #(concat % [lift]) (permutations lambdas))))]
     (last (into (sorted-map)
-                (for [result finals]
+                (for [result results]
                   [(compute-score result) result])))))
 
 (defn run-ai-vector
