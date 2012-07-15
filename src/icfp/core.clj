@@ -390,3 +390,16 @@
   [d1 d2]
   (let [opposites #{[:L :R] [:R :L] [:U :D] [:D :U]}]
     (opposites [d1 d2])))
+
+(defn immovable?
+  [{:keys [board] :as game-state} [x y :as pos]]
+  (condp = (get-in board pos)
+    :L true
+    :O true
+    :# true
+    :> true
+
+    :* (not (or (= :_ (get-in board [(dec x) y]))
+                (= :_ (get-in board [(inc x) y]))))
+
+    false))
