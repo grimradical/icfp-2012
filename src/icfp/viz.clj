@@ -8,19 +8,31 @@
 (declare colors)
 
 (defn draw-game
-  [{:keys [board water] :as game}]
+  [{:keys [board current-goal] :as game}]
   (let [trans-x #(* sprite-size %)
         trans-y #(* sprite-size (- (inc (core/height board)) %))]
-    (fill 0 0 0)
     (doseq [[x ys] board
             [y obj] ys
             :let [xp (trans-x x)
-                  yp (trans-y y)]]
-      (if-let [i (images obj)]
-        (image i (- xp sprite-size) (- yp sprite-size))
-        (do
-          (apply fill (colors obj))
-          (rect (- xp sprite-size) (- yp sprite-size) 16 16))))))
+                  yp (trans-y y)
+                  overlay (cond
+                            (= [x y] current-goal)
+                            :goal)]]
+
+      (when-let [i (images obj)]
+        (image i (- xp sprite-size) (- yp sprite-size)))
+
+      (when-let [c (colors obj)]
+        (apply fill c)
+        (rect (- xp sprite-size) (- yp sprite-size) 16 16)
+        (no-fill))
+
+      (when-let [c (colors overlay)]
+        (no-fill)
+        (apply stroke c)
+        (stroke-weight 3)
+        (rect (- xp sprite-size) (- yp sprite-size) 16 16)
+        (no-stroke)))))
 
 (defn setup-with-game
   [{:keys [board] :as game}]
@@ -35,7 +47,8 @@
                  })
 
     (def colors {:_ [0 0 0]
-                 :. [139 69 19]})
+                 :. [139 69 19]
+                 :goal [0 255 255]})
     (smooth)))
 
 (defn game-to-sketch

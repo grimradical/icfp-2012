@@ -154,7 +154,7 @@
     (+ dist dead win s backtrack below-rock)))
 
 (defn stupid-2
-  [{:keys [robot lambdas lift] :as g}]
+  [{:keys [current-goal robot lambdas lift] :as g}]
   (let [dest  (first (closest robot lambdas))
         costs (for [m [:U :D :L :R]
                     :when (move-allowed? g m)]
@@ -163,10 +163,12 @@
         dir   (second (first costs))
         ]
     (prn)
+    (prn current-goal)
     (prn costs)
     (prn dir)
     (prn robot)
     (-> g
+        (assoc :current-goal dest)
         (step dir))))
 
 (defn run-sequence
