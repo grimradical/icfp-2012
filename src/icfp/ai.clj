@@ -286,10 +286,11 @@
 
 (defn run-ai
   ([f game-ref]
-     (run-ai f game-ref nil))
-  ([f game-ref num-steps]
+     (run-ai f game-ref nil nil))
+  ([f game-ref num-steps delay]
      (loop [n 0]
-       ;;(Thread/sleep 800)
+       (when delay
+         (Thread/sleep delay))
        (if-not (game-over? @game-ref)
          (do
            (dosync
