@@ -9,7 +9,7 @@
 ;; flooding - current flooding rate
 ;; waterproof - how many turns the robot can stay underwater until it dies
 (defstruct game-state :board :status :lambdas :rocks :lift :robot :score :moves
-    :water :flooding :waterproof)
+    :water :flooding :waterproof :g :growth :razors :beards)
 
 (defn replace-in-set
   [s old new]
@@ -94,6 +94,20 @@
   [position]
   [(first position) (dec (last position))])
 
+(defn adjacent-coords
+  [pos]
+  [(up pos)
+   (down pos)
+   (left pos)
+   (right pos)])
+
+(defn surrounding-coords
+  [pos]
+  (concat (adjacent-coords pos) [(left (up pos))
+                                 (right (up pos))
+                                 (left (down pos))
+                                 (right (down pos))]))
+
 (defn movable?
   [game-state position]
   (or (space? game-state position)
@@ -153,8 +167,7 @@
          (rock? game-state old-rock)]
    :post [(assert-game-state %)
           (space? % old-rock)
-          (rock? % new-rock)
-          (= (count rocks) (count (:rocks %)))]}
+          (rock? % new-rock)]}
   (-> game-state
     (update-in [:rocks] replace-in-set old-rock new-rock)
     (move-to-position :* old-rock new-rock)
@@ -291,6 +304,24 @@
   (let [possible-falls (juxt fall-down fall-right fall-left)]
     (first (remove nil? (possible-falls game-state position)))))
 
+(defn add-beard
+  [game-state beard]
+  (-> game-state
+    (update-in [:beards] conj beard)
+    (update-in [:board] assoc-in beard :W)))
+
+(defn grow-beard
+  [{:keys [board] :as game-state} beard]
+  (let [new-beards (filter #(space? game-state %) (surrounding-coords beard))]
+    (reduce add-beard game-state new-beards)))
+
+(defn grow-beards
+  [{:keys [beards g growth board] :as game-state}]
+  (if (zero? g)
+    (let [new-state  (reduce grow-beard game-state beards)]
+      (assoc new-state :g (dec growth)))
+    (update-in game-state [:g] dec)))
+
 (defn update-board
   [{:keys [rocks robot] :as game-state}]
   {:pre [(assert-game-state game-state)]
@@ -299,7 +330,8 @@
                              :let [new-rock (fall-rock game-state rock)]
                              :when new-rock]
                          [rock new-rock])]
-    (reduce #(apply move-rock %1 %2) game-state rock-movements)))
+    (-> (reduce #(apply move-rock %1 %2) game-state rock-movements)
+      (grow-beards))))
 
 (defn step
   [{:keys [status] :as game-state} command]
@@ -346,18 +378,9 @@
   (= status :aborted))
 
 (defn game-over?
-  [game-state]
+  [{:keys [status] :as game-state}]
   {:pre [(assert-game-state game-state)]}
-  (or (aborted? game-state)
-      (win? game-state)
-      (lose? game-state)))
-
-(defn surrounding-coords
-  [[x y]]
-  [[(inc x) y]
-   [(dec x) y]
-   [x (inc y)]
-   [x (dec y)]])
+  (not= status :alive))
 
 (defn wait-n-turns
   [game-state n]
@@ -406,7 +429,7 @@
   (let [liberty? #(or (#{:_ :. :> :R} (get-in board %))
                       (and (rock? game-state %)
                            (rock-movable? game-state %)))
-        candidates (surrounding-coords pos)]
+        candidates (adjacent-coords pos)]
     (empty? (filter liberty? candidates))))
 
 (defn lift-blocked?

@@ -11,6 +11,7 @@
       (= c " ") "_"
       (= c "\\") ">"
       (valid-map-chars c) c
+      (= c "!") :#
       (re-matches #"[A-I1-9]" c) :#
       :else c)))
 
@@ -53,13 +54,11 @@
       [x y])))
 
 (defn get-object-locations [board]
-  {
-    :lambdas (find-objects board :>)
-    :rocks (find-objects board :*)
-    :robot (first (find-objects board :R))
-    :lift (first (find-objects board :L))
-  }
-  )
+  {:lambdas (find-objects board :>)
+   :rocks (find-objects board :*)
+   :robot (first (find-objects board :R))
+   :lift (first (find-objects board :L))
+   :beards (find-objects board :W)})
 
 (defn build-board [rows]
   (let [numrows (count rows)
@@ -81,12 +80,13 @@
         water (metadata "Water")
         flooding (metadata "Flooding")
         waterproof (metadata "Waterproof")
+        growth (metadata "Growth")
+        razors (metadata "Razors")
         ; TODO: would be more efficient to do a binding or something,
         ;  and gather information about the object locations while
         ;  we are parsing the lines.  For now, just iterating after
         ;  the fact.
-        object-locations (get-object-locations board)
-        ]
+        object-locations (get-object-locations board)]
       (struct-map game-state
         :board board
         :status :alive
@@ -94,13 +94,15 @@
         :rocks (:rocks object-locations)
         :robot (:robot object-locations)
         :lift (:lift object-locations)
+        :beards (:beards object-locations)
         :score 0
         :moves []
-        :water water
-        :flooding flooding
-        :waterproof waterproof
-        )))
-
+        :water (if water (Integer/parseInt water) 0)
+        :flooding (if flooding (Integer/parseInt flooding) 0)
+        :waterproof (if waterproof (Integer/parseInt waterproof) 10)
+        :growth (if growth (Integer/parseInt growth) 25)
+        :g (dec (if growth (Integer/parseInt growth) 25))
+        :razors (if razors (Integer/parseInt razors) 0))))
 
 (defn read-game-state-from-file [path]
   (with-open

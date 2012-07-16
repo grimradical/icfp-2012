@@ -1,7 +1,8 @@
 (ns icfp.ai
   (:use icfp.core
         clojure.data.priority-map
-        clojure.math.combinatorics))
+        clojure.math.combinatorics
+        icfp.viz))
 
 (defn distance
   [[x1 y1] [x2 y2]]
@@ -210,7 +211,7 @@
         path)))))
 
 (defn a*-targets
-  [game-state targets]
+  [game-state targets callback-agent]
   (let [edge-fn edges
         cost-fn (fn [a b]
                   (cond
@@ -224,12 +225,16 @@
                     ;; 1000000
 
                     ;; It's even worse to block the lift than our own target!
-                    (position-blocked? (wait-n-turns a 10) (:lift a))
+                    (let [future (wait-n-turns a 10)]
+                      (if-not (game-over? future)
+                        (position-blocked? future (:lift a))))
                     100000
 
                     ;; We want to try not to block the goal. We'd rather do
                     ;; that than die or abort, though.
-                    (position-blocked? (wait-n-turns a 10) (:robot b))
+                    (let [future (wait-n-turns a 10)]
+                      (if-not (game-over? future)
+                        (position-blocked? future (:robot b))))
                     10000
 
                     :else
@@ -239,7 +244,14 @@
                     (aborted? curr)
                     (lose? curr)))]
     (let [solution (reduce (fn [start goal]
+                             (when callback-agent
+                               (send callback-agent assoc :current-goal goal))
                              (let [result (a* edge-fn cost-fn goal? start {:robot goal})]
+                               (doseq [move (subvec (:moves result) (count (:moves start)))]
+                                 (when callback-agent
+                                   (println "Press enter:")
+                                   (read-line) 
+                                   (send callback-agent step move)))
                                (println (str "Path so far: " (clojure.string/join (map name (:moves result)))))
                                result)) game-state targets)]
       ;; Make sure the game is completely done, for scoring purposes. It might
@@ -268,13 +280,19 @@
         [(compute-score current) current]))))))
 
 (defn a*-ai
-  [{:keys [robot lambdas lift] :as game-state}]
+  [{:keys [robot lambdas lift] :as game-state} agent]
   (let [strategy (hamiltonian (cons robot lambdas))
         ;; Take the rest because the first one is the robot, and add the lift
         targets (concat (rest strategy) [lift])
-        result (a*-targets game-state targets)]
+        result (a*-targets game-state targets agent)]
     [(compute-score result) result]
     result))
+
+(defn viz-a*
+  [map-file]
+  (let [state (agent (icfp.io/read-game-state-from-file map-file))]
+    (game-to-sketch state)
+    (a*-ai @state state)))
 
 (defn run-ai-vector
   [moves game-ref]
