@@ -273,7 +273,8 @@
         ;; Take the rest because the first one is the robot, and add the lift
         targets (concat (rest strategy) [lift])
         result (a*-targets game-state targets)]
-    [(compute-score result) result]))
+    [(compute-score result) result]
+    result))
 
 (defn run-ai-vector
   [moves game-ref]
@@ -284,14 +285,18 @@
         (alter game-ref step move)))))
 
 (defn run-ai
-  [f game-ref]
-  (loop [n 0]
-    ;;(Thread/sleep 800)
-    (if-not (game-over? @game-ref)
-      (do
-        (dosync
-         (ref-set game-ref (f @game-ref)))
-        (if (< n 100)
-          (recur (inc n))
-          (prn "Terminating early")))
-      @game-ref)))
+  ([f game-ref]
+     (run-ai f game-ref nil))
+  ([f game-ref num-steps]
+     (loop [n 0]
+       ;;(Thread/sleep 800)
+       (if-not (game-over? @game-ref)
+         (do
+           (dosync
+            (ref-set game-ref (f @game-ref)))
+           (if (nil? num-steps)
+             (recur nil)
+             (if (< n num-steps)
+               (recur (inc n))
+               @game-ref)))
+         @game-ref))))
