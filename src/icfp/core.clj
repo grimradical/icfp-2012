@@ -130,8 +130,7 @@
       (earth? game-state position)
       (open-lift? game-state position)
       (lambda? game-state position)
-      (razor? game-state position)
-      (shaveable-beard? game-state position)))
+      (razor? game-state position)))
 
 (defn move-allowed?
   [{:keys [board robot] :as game-state} move]
@@ -211,8 +210,7 @@
           (space? % position)]}
   (-> game-state
     (update-in [:board] assoc-in position :_)
-    (update-in [:beards] disj position)
-    (update-in [:razors] dec)))
+    (update-in [:beards] disj position)))
 
 (defn shave-beards
   [{:keys [robot razors] :as game-state}]
@@ -223,9 +221,10 @@
           (every? (partial space? %)
                   (filter (partial shaveable-beard? game-state)
                           (surrounding-coords robot)))]}
-  (reduce shave-beard game-state
-          (filter (partial shaveable-beard? game-state)
-                  (surrounding-coords robot))))
+  (let [beards-to-shave (filter (partial shaveable-beard? game-state)
+                                  (surrounding-coords robot))
+        new-state (reduce shave-beard game-state beards-to-shave)]
+    (update-in new-state [:razors] dec)))
 
 (defn move-robot
   [{:keys [robot] :as game-state} direction]

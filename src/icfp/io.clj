@@ -58,7 +58,8 @@
    :rocks (find-objects board :*)
    :robot (first (find-objects board :R))
    :lift (first (find-objects board :L))
-   :beards (find-objects board :W)})
+   :beards (find-objects board :W)
+   :razors (find-objects board :!)})
 
 (defn build-board [rows]
   (let [numrows (count rows)

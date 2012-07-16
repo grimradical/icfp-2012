@@ -285,8 +285,9 @@
         [(compute-score current) current]))))))
 
 (defn a*-ai
-  [{:keys [robot lambdas lift] :as game-state} agent]
-  (let [strategy (hamiltonian (cons robot lambdas))
+  [{:keys [robot lambdas lift board] :as game-state} agent]
+  (let [razor-positions (:razors (icfp.io/get-object-locations board))
+        strategy (hamiltonian (concat (cons robot lambdas) razor-positions))
         ;; Take the rest because the first one is the robot, and add the lift
         targets (concat (rest strategy) [lift])
         result (a*-targets game-state targets agent)]
@@ -294,10 +295,14 @@
     result))
 
 (defn viz-a*
-  [map-file]
-  (let [state (agent (icfp.io/read-game-state-from-file map-file))]
-    (game-to-sketch state)
-    (a*-ai @state state)))
+  ([map-file]
+   (viz-a* map-file (agent nil)))
+  ([map-file a]
+   (let [state (icfp.io/read-game-state-from-file map-file)]
+     (send a (constantly state))
+     (await a)
+     (game-to-sketch a)
+     (a*-ai state a))))
 
 (defn run-ai-vector
   [moves game-ref]
