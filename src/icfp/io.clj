@@ -3,20 +3,16 @@
 
 (def valid-map-chars #{"#" "\\" "." " " "R" "L" "*"})
 
-(defn is-valid-map-char? [c]
-  (let [valid (not (nil? (valid-map-chars c)))]
-    (if-not valid (println (format "Invalid map char '%s'" c)))
-    valid))
-
 (defn char-to-keyword [c]
-  {  :pre [(is-valid-map-char? c)] }
   (keyword
-    (condp = c
+    (cond
       ; convert a few of the input symbols to things that are easier to
       ;  represent as literals in clojure
-      " " "_"
-      "\\" ">"
-      c)))
+      (= c " ") "_"
+      (= c "\\") ">"
+      (valid-map-chars c) c
+      (re-matches #"[A-I1-9]" c) :#
+      :else c)))
 
 (defn line-to-keyword-seq [line]
   (map char-to-keyword (map str line)))
@@ -46,7 +42,8 @@
   (clojure.string/split line #"\s+"))
 
 (defn metadata-lines-to-map [lines]
-  (into {} (map #(vec (split-metadata-line %1)) lines)))
+  (into {} (remove #(#{"Trampoline"} (first %))
+                   (map #(vec (split-metadata-line %1)) lines))))
 
 (defn find-objects [board sym]
   (into #{}
@@ -119,7 +116,7 @@
     c))
 
 (defn pretty-format-row [row]
-  (clojure.string/join "" (map convert-back-to-orig-game-char (map name row))))
+  (apply str (map convert-back-to-orig-game-char (map name row))))
 
 (defn sorted-row-numbers [board]
   (sort (keys board)))
