@@ -13,4 +13,5 @@ lein deps
 lein uberjar
 cp icfp-1.0.0-SNAPSHOT-standalone.jar $DIR/icfp.jar
 
-tar czvf ${DIR}.tgz $DIR
+cd $DIR
+tar czvf ../${DIR}.tgz *

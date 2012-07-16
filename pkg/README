@@ -7,4 +7,5 @@ and special guest Andy Parker <andy@puppetlabs.com>
 
 HOW IT WORKS:
 
-<todo>
+A* pathfinding between lambdas, which are sorted greedily by proximity
+(Hamiltonian path). Also, lots of parentheses.

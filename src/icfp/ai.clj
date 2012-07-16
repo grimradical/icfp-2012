@@ -1,8 +1,7 @@
 (ns icfp.ai
   (:use icfp.core
         clojure.data.priority-map
-        clojure.math.combinatorics
-        icfp.viz))
+        clojure.math.combinatorics))
 
 (defn distance
   [[x1 y1] [x2 y2]]
@@ -106,7 +105,7 @@
 
 (defn a*
   [edge-fn cost-fn goal? start goal]
-  (println (format "Navigating from %s to %s" (:robot start) (:robot goal)))
+  ;;(println (format "Navigating from %s to %s" (:robot start) (:robot goal)))
   (loop [closed #{}
         [current [f1 g1 h1]] [start [(cost-fn start goal) 0 (cost-fn start goal)]]
         g {start g1}
@@ -248,11 +247,9 @@
                                (send callback-agent assoc :current-goal goal))
                              (let [result (a* edge-fn cost-fn goal? start {:robot goal})]
                                (doseq [move (subvec (:moves result) (count (:moves start)))]
+                                 (println (name move))
                                  (when callback-agent
-                                   (println "Press enter:")
-                                   (read-line) 
                                    (send callback-agent step move)))
-                               (println (str "Path so far: " (clojure.string/join (map name (:moves result)))))
                                result)) game-state targets)]
       ;; Make sure the game is completely done, for scoring purposes. It might
       ;; be still alive if we decided to skip all our targets, in which case we
@@ -289,6 +286,7 @@
     [(compute-score result) result]
     result))
 
+(comment
 (defn viz-a*
   ([map-file]
    (viz-a* map-file (agent nil)))
@@ -298,13 +296,14 @@
      (await a)
      (game-to-sketch a)
      (a*-ai state a))))
+)
 
 (defn run-ai-vector
   [moves game-ref]
   (doseq [move moves]
     (if-not (game-over? @game-ref)
       (dosync
-        (prn "Trying to move" move)
+        ;;(prn "Trying to move" move)
         (alter game-ref step move)))))
 
 (defn run-ai

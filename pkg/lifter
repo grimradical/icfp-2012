@@ -1,2 +1,2 @@
 #!/bin/bash
-exec java -jar icfp.jar
+exec java -Xmx512m -jar icfp.jar
