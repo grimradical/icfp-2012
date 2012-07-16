@@ -1,0 +1,16 @@
+#!/bin/bash
+set -x
+
+DIR=icfp-96302724
+rm -rf $DIR
+mkdir $DIR
+cp -R src $DIR/src
+rm -rf $DIR/src/chris_scratch
+cp pkg/* $DIR/
+
+lein clean
+lein deps
+lein uberjar
+cp icfp-1.0.0-SNAPSHOT-standalone.jar $DIR/icfp.jar
+
+tar czvf ${DIR}.tgz $DIR
