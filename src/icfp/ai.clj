@@ -9,11 +9,6 @@
   (Math/sqrt (+ (Math/pow (- x2 x1) 2)
                 (Math/pow (- y2 y1) 2))))
 
-(defn manhattan-distance
-  [[x1 y1] [x2 y2]]
-  (+ (Math/abs (- x2 x1))
-     (Math/abs (- y2 y1))))
-
 (defn directions-from
   [[x1 y1] [x2 y2]]
   (let [dirs {[:= :=] [:W]

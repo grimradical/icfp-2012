@@ -469,9 +469,9 @@
   ;; A rock is movable if there an empty space next to it, of if just
   ;; waiting a turn causes it to change position on its own (sliding)
   (or (and (= :_ (get-in board [(dec x) y]))
-          (= :_ (get-in board [(inc x) y])))
+           (= :_ (get-in board [(inc x) y])))
       (let [future (step game-state :W)]
-        (not= :* (get-in (:board future) pos)))))
+        (not (rock? future pos)))))
 
 (defn immovable?
   [{:keys [board] :as game-state} [x y :as pos]]
@@ -487,14 +487,27 @@
   [game-state pos]
   (not (rock-movable? game-state pos)))
 
+(defn manhattan-distance
+  [[x1 y1] [x2 y2]]
+  (+ (Math/abs (- x2 x1))
+     (Math/abs (- y2 y1))))
+
+(defn position-blocked?*
+  [{:keys [board] :as game-state} visited original-pos pos]
+  (if (> (manhattan-distance original-pos pos) 5)
+    false
+    (if (and (not (visited pos))
+             (or (movable? game-state pos)
+                 (robot? game-state pos)
+                 (shaveable-beard? game-state pos)
+                 (and (rock? game-state pos)
+                      (rock-movable? game-state pos))))
+      (every? (partial position-blocked?* game-state (conj visited pos) original-pos) (adjacent-coords pos))
+      true)))
+
 (defn position-blocked?
-  [{:keys [board] :as game-state} pos]
-  (let [liberty? #(or (#{:_ :. :> :R} (get-in board %))
-                      (shaveable-beard? game-state pos)
-                      (and (rock? game-state %)
-                           (rock-movable? game-state %)))
-        candidates (adjacent-coords pos)]
-    (empty? (filter liberty? candidates))))
+  [game-state pos]
+  (position-blocked?* game-state #{} pos pos))
 
 (defn lift-blocked?
   [{:keys [lift] :as game-state}]
