@@ -55,12 +55,17 @@
                              (disj commands :D)
                              commands))
           remove-illegal-commands (fn [game-state goal commands]
-                                    (filter #(command-allowed? game-state %) commands))
+                                    (set (filter #(command-allowed? game-state %) commands)))
+          only-shave-beards (fn [game-state goal commands]
+                              (if (some #(shaveable-beard? game-state %) (surrounding-coords (:robot game-state)))
+                                commands
+                                (disj commands :S)))
           command-rules [giveup-if-lift-closed
                          giveup-if-blocked
                          flee-from-doom
-                         remove-illegal-commands]
-          commands (reduce #(%2 game-state goal %1) #{:L :R :U :D} command-rules)]
+                         remove-illegal-commands
+                         only-shave-beards]
+          commands (reduce #(%2 game-state goal %1) #{:L :R :U :D :S} command-rules)]
       (for [command commands]
         (step game-state command)))))
 

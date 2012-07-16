@@ -39,6 +39,19 @@
   [{:keys [board]} position]
   (= (get-in board position) :>))
 
+(defn beard?
+  [{:keys [board]} position]
+  (= (get-in board position) :W))
+
+(defn shaveable-beard?
+  [{:keys [board razors] :as game-state} position]
+  (and (beard? game-state position)
+       (pos? razors)))
+
+(defn razor?
+  [{:keys [board]} position]
+  (= (get-in board position) :!))
+
 (defn open-lift?
   [{:keys [board] :as game-state} position]
   (= (get-in board position) :O))
@@ -53,11 +66,14 @@
       (closed-lift? game-state position)))
 
 (defn assert-game-state
-  [{:keys [board lambdas rocks lift robot] :as game-state}]
+  [{:keys [board lambdas rocks lift robot beards razors g growth] :as game-state}]
   (assert (map? game-state))
   (assert (map? board))
   (assert (every? (partial lambda? game-state) lambdas))
   (assert (every? (partial rock? game-state) rocks))
+  (assert (every? (partial beard? game-state) beards))
+  (assert (>= razors 0))
+  (assert (and (< g growth) (>= g 0)))
   (assert (or (lift? game-state lift)
               (and (robot? game-state lift)
                    (empty? lambdas))))
@@ -113,7 +129,9 @@
   (or (space? game-state position)
       (earth? game-state position)
       (open-lift? game-state position)
-      (lambda? game-state position)))
+      (lambda? game-state position)
+      (razor? game-state position)
+      (shaveable-beard? game-state position)))
 
 (defn move-allowed?
   [{:keys [board robot] :as game-state} move]
@@ -128,12 +146,13 @@
                  (space? game-state (rright robot))))))
 
 (defn command-allowed?
-  [{:keys [board robot] :as game-state} command]
+  [{:keys [board robot razors] :as game-state} command]
   (condp = command
     :L (move-allowed? game-state :L)
     :R (move-allowed? game-state :R)
     :U (move-allowed? game-state :U)
     :D (move-allowed? game-state :D)
+    :S (pos? razors)
     :W true
     :A true))
 
@@ -184,6 +203,30 @@
       (move-rock game-state old-rock new-rock))
     game-state))
 
+(defn shave-beard
+  [{:keys [razors] :as game-state} position]
+  {:pre [(assert-game-state game-state)
+         (shaveable-beard? game-state position)]
+   :post [(assert-game-state %)
+          (space? % position)]}
+  (-> game-state
+    (update-in [:board] assoc-in position :_)
+    (update-in [:beards] disj position)
+    (update-in [:razors] dec)))
+
+(defn shave-beards
+  [{:keys [robot razors] :as game-state}]
+  {:pre [(assert-game-state game-state)
+         (pos? razors)]
+   :post [(assert-game-state %)
+          (= (:razors %) (dec razors))
+          (every? (partial space? %)
+                  (filter (partial shaveable-beard? game-state)
+                          (surrounding-coords robot)))]}
+  (reduce shave-beard game-state
+          (filter (partial shaveable-beard? game-state)
+                  (surrounding-coords robot))))
+
 (defn move-robot
   [{:keys [robot] :as game-state} direction]
   {:pre [(assert-game-state game-state)]
@@ -232,6 +275,23 @@
     (collect-lambda* game-state position)
     game-state))
 
+(defn collect-razor*
+  [{:keys [razors score] :as game-state} position]
+  {:pre [(razor? game-state position)]
+   :post [(= (:razors %) (inc razors))
+          (space? % position)]}
+  (-> game-state
+    (update-in [:board] assoc-in position :_)
+    (update-in [:razors] inc)))
+
+(defn collect-razor
+  [game-state position]
+  {:pre [(assert-game-state game-state)]
+   :post [(assert-game-state %)]}
+  (if (razor? game-state position)
+    (collect-razor* game-state position)
+    game-state))
+
 (defn enter-lift
   [{:keys [status lambdas lift robot] :as game-state}]
   {:pre [(not= (empty? lambdas)
@@ -251,6 +311,7 @@
     (-> game-state
       (push-rock direction)
       (collect-lambda (direction robot))
+      (collect-razor (direction robot))
       (move-robot direction)
       (enter-lift))))
 
@@ -265,6 +326,9 @@
 
                       (= :W command)
                       game-state
+
+                      (= :S command)
+                      (shave-beards game-state)
 
                       (= :A command)
                       (assoc game-state :status :aborted))]
@@ -427,6 +491,7 @@
 (defn position-blocked?
   [{:keys [board] :as game-state} pos]
   (let [liberty? #(or (#{:_ :. :> :R} (get-in board %))
+                      (shaveable-beard? game-state pos)
                       (and (rock? game-state %)
                            (rock-movable? game-state %)))
         candidates (adjacent-coords pos)]
