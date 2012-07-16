@@ -405,10 +405,10 @@
   {:pre [(rock? game-state pos)]}
   ;; A rock is movable if there an empty space next to it, of if just
   ;; waiting a turn causes it to change position on its own (sliding)
-  (or (or (= :_ (get-in board [(dec x) y]))
+  (or (and (= :_ (get-in board [(dec x) y]))
           (= :_ (get-in board [(inc x) y])))
       (let [future (step game-state :W)]
-        (= :* (get-in (:board future) pos)))))
+        (not= :* (get-in (:board future) pos)))))
 
 (defn immovable?
   [{:keys [board] :as game-state} [x y :as pos]]

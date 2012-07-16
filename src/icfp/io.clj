@@ -12,6 +12,7 @@
       (= c "\\") ">"
       (valid-map-chars c) c
       (= c "!") :#
+      (= c "@") :*
       (re-matches #"[A-I1-9]" c) :#
       :else c)))
 
